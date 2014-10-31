@@ -7,12 +7,21 @@ import Data.Maybe
 import Control.Monad (unless, when)
 import Control.Monad.Eff
 import Control.Monad.ST (ST(), STArray(), newSTArray, runSTArray)
+import qualified Data.Bifunctor as Bifunctor
 
 import Angular (copy, extend)
 import Angular.Location (Location(), getPath, setPath)
-import Angular.Scope (Scope(), watch, readScope, extendScope, modifyScope)
+import Angular.Scope (Scope(), watch, readScope, extendScope, modifyScope, writeScope)
 import Angular.This(readThis, writeThis)
 import Angular.ST (readSTArray, pushSTArray, pushAllSTArray, writeSTArray, spliceSTArray)
+
+import qualified Data.DOM.Simple.Ajax as Ajax
+import qualified Angular.Http as Http
+import qualified Angular.Promise as Promise
+import qualified Angular.Promise.Eff as PromiseEff
+import qualified Angular.Promise.Cont as PromiseCont
+import qualified Control.Monad.Cont.Trans as Cont
+import qualified Control.Monad.Trans as Trans
 
 import Todomvc.Storage (Store(), Todo(), get, put)
 
@@ -102,7 +111,22 @@ watchLocationPath scope =
                                 _            -> extendScope { statusFilter: { } } scope
   in watch expr (return listener) false scope
 
-todoctrl scope this location = do
+getVersion http scope = do
+  p <- Http.get "version.txt" http
+  c <- PromiseCont.cont_ p
+  let 
+    parse (Ajax.TextData s) = s
+    parse _ = "error: unexpected response type"
+    parseData d = parse d."data"
+    ok r = writeScope "version" r scope
+    fail r = writeScope "version" ("error: " ++ r.statusText) scope
+  Cont.runContT (parseData <$> c) ok
+  {-
+  returnE $ PromiseEff.unsafeRunPromiseEff $
+    PromiseEff.PromiseEff (Bifunctor.bimap fail ok p) >>= pure
+    -}
+
+todoctrl scope this location http = do
   t <- readThis this
   path <- getPath location
   if S.length path == 0 then setPath "/" location else return ""
@@ -126,4 +150,6 @@ todoctrl scope this location = do
               , editTodo: editTodo scope
               , doneEditing: doneEditing scope
               , removeTodo: removeTodo scope
-              , revertEditing: revertEditing scope } scope
+              , revertEditing: revertEditing scope
+              , version: "get"
+              , getVersion: getVersion http scope } scope

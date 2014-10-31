@@ -1025,6 +1025,24 @@
     writeRequestData :: forall a. RequestData a -> ForeignRequestData
 
 
+## Module Angular.Promise.Cont
+
+### Type Classes
+
+    class PromiseCont m where
+      cont :: forall e a r. Promise e a -> m (ContT (Promise e r) m a)
+      cont_ :: forall e a r. Promise e a -> m (ContT Unit m a)
+      cont'_ :: forall e a r. Promise e a -> m (ContT Unit m (Either e a))
+
+
+### Type Class Instances
+
+    instance promiseContEff :: PromiseCont (Eff eff)
+
+
+### Values
+
+
 ## Module Angular.Promise.Eff
 
 ### Types
